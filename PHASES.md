@@ -11,7 +11,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 | 0 — AWS account setup & guardrails | ✅ complete (2026-07-29) |
 | 1 — Data | ✅ complete (2026-07-29) |
 | 2 — Train a model on SageMaker | ✅ complete (2026-07-30) — cost $0.005 |
-| 3 — Register the model | ⬜ not started |
+| 3 — Register the model | ✅ complete (2026-07-30) — $0, metadata only |
 | 4 — Deploy a real-time endpoint | ⬜ not started |
 | 5 — Batch Transform (optional) | ⬜ not started |
 | 6 — Teardown & hygiene | ⬜ not started |
@@ -83,16 +83,16 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 ---
 
-## Phase 3 — Register the model ⬜
+## Phase 3 — Register the model ✅
 
 **Goal:** the artifact becomes a first-class "Model" object, not just a file.
 
-- [ ] Create a SageMaker `Model` pointing at your artifact and the **SKLearn framework container** SageMaker used to run `train.py` (the same image family, now paired with your `inference.py` from Phase 4 for serving).
-- [ ] Optional stretch: register it in the SageMaker Model Registry (a light touch — this is the closest AWS analog to "versioned model artifact gated by an eval report," which is how LyftLearn's CI/CD treats models).
+- [x] Create a SageMaker `Model` pointing at your artifact and the **SKLearn framework container** SageMaker used to run `train.py` (the same image family, now paired with your `inference.py` from Phase 4 for serving).
+- [x] Optional stretch: register it in the SageMaker Model Registry (a light touch — this is the closest AWS analog to "versioned model artifact gated by an eval report," which is how LyftLearn's CI/CD treats models).
 
 **Acceptance criteria:**
-- [ ] 1. `aws sagemaker list-models` shows your model.
-- [ ] 2. You can state which container/image it's tied to and why that matters (the container is generic infra; your code — training and inference scripts — is the actual owned artifact, same split as Phase 2).
+- [x] 1. `aws sagemaker list-models` shows your model.
+- [x] 2. You can state which container/image it's tied to and why that matters (the container is generic infra; your code — training and inference scripts — is the actual owned artifact, same split as Phase 2).
 
 ---
 

@@ -249,6 +249,85 @@ failures were all infrastructure, never modeling.
 
 ---
 
+## Status: Phase 3 — COMPLETE (2026-07-30). Cost: $0.
+
+Metadata only — nothing provisioned, nothing executed.
+
+| Criterion | Result |
+|---|---|
+| 1. `list-models` shows the model | PASS — `learn-sage-pctr-2026-07-30-19-35-01-384` |
+| 2. Which image, and why it matters | see below |
+
+Created: a `Model`, plus Model Package Group `learn-sage-pctr` with version 1,
+`Approved`, metrics pointing at
+`s3://learn-sage-ACCOUNT_ID/eval/<job>/metrics.json`.
+
+### What the registry validates — measured, not assumed
+
+I claimed the registry "validates nothing." **That was wrong**, and only a
+negative test caught it. Registering deliberately-broken versions shows:
+
+| Thing | Validated at registration? |
+|---|---|
+| Model artifact S3 object exists | **YES** — `ValidationException: Cannot find S3 object` |
+| `ModelMetrics` S3 URI exists | **NO** — a nonexistent path registers fine |
+| The metric values themselves | **NO** — nothing opens the file |
+| Container can load the artifact | **NO** — never attempted |
+| `ModelApprovalStatus` justified | **NO** — set straight to `Approved` |
+
+Accurate summary: it verifies the artifact is **present**, nothing about whether
+it's **good**. Both bogus test versions were deleted; the group holds version 1
+only.
+
+The gate is really four separate things, and the registry is only the third:
+you run the evaluation; you decide whether it passes; the registry records the
+artifact, the metrics *location*, and the verdict; your deployment pipeline
+refuses anything not `Approved`. Miss the fourth and "Approved" means somebody
+set a string. Automating the third-to-fourth link is SageMaker Pipelines'
+`ConditionStep` — different machinery, out of scope here.
+
+**The distinction that matters for an ads-ranking manager:** "we have a model
+registry" and "we have an enforced quality gate" are different claims. Worth
+asking Ravi's team where LyftLearn's enforcement actually lives — automated
+threshold in CI, or a human reading a dashboard.
+
+### The image is pinned to the one that produced the artifact
+
+`sagemaker-scikit-learn:1.4-2-cpu-py3` — identical to
+`AlgorithmSpecification.TrainingImage` from the training job.
+
+Getting there needed a workaround worth recording. sklearn uses **one image
+family** for training and inference (same ECR repo, different tags), but this
+SDK version's *inference* version list is stale — it stops at `1.2-1` while
+training reaches `1.4-2`, so `image_scope="inference"` raises
+`ValueError: Unsupported sklearn version: 1.4-2`.
+
+Falling back to `1.2-1` would be a **correctness bug, not a cosmetic one**: the
+artifact was pickled by scikit-learn 1.4.2, and sklearn does not support loading
+a newer version's pickle in an older runtime. So `register_model.py` retrieves
+with `image_scope="training"` and uses that URI for serving. The comment there
+explains why, because it looks like a mistake otherwise.
+
+Also: the ECR account hosting AWS images differs per region (`683313688378` in
+us-east-1), so the URI is resolved via `image_uris.retrieve`, never hardcoded.
+
+### Deliberately NOT done: `inference.py`
+
+Phase 3's text mentions the container being "paired with your `inference.py`
+from Phase 4." That's forward context, not a Phase 3 task, and writing it here
+would violate the work-only-on-the-named-phase rule.
+
+Consequence, stated plainly: **the Model created here would not serve correctly
+if deployed today.** The container's default handler loads `model.joblib` but
+knows nothing about `featurizer.joblib` or the `col=value` tokenisation, so it
+would score raw strings and fail. Phase 4 supplies `inference.py` and, on
+deploy, creates its own Model including it — superseding this one.
+
+That SageMaker happily created an unservable Model is the phase's real lesson:
+"first-class object" means addressable and versioned, not validated.
+
+---
+
 ## Environment
 
 | Thing | Value |

@@ -1,0 +1,49 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+
+# Data — the Avazu sample lives in S3, not in git (Phase 1)
+data/
+
+# Model artifacts pulled down from S3 (Phase 2+)
+*.tar.gz
+*.joblib
+model/
+
+# Never commit credentials.
+#
+# Anything secret goes in secrets/ — one directory rule is harder to get
+# wrong than remembering per-file patterns. The filename patterns below are
+# a backstop in case a key file lands somewhere else by accident.
+#
+# AWS's IAM console downloads access keys as a CSV like
+# `learn-sage-dev_accessKeys.csv`. That file is redundant with
+# ~/.aws/credentials (which is what the CLI actually reads) — prefer
+# deleting it over keeping a second copy anywhere.
+secrets/
+.env
+*.pem
+credentials
+*accessKeys*.csv
+*accessKeys*
+*credentials*.csv
+*_secret*
+.aws/
+
+# ...but not the secret *scanner*. The `*_secret*` backstop above matches
+# `check_secrets.sh` and silently excluded it from the first commit — the
+# safety net swallowing the safety tool. Without this negation a fresh clone
+# gets a pre-commit hook pointing at a file that doesn't exist.
+!scripts/check_secrets.sh
+
+# Claude Code local settings. Records the literal commands run in a session,
+# which can include the AWS account ID. A global ignore rule covers this on
+# this machine, but the repo is public — it must be ignored here too, or a
+# fresh clone elsewhere would happily commit it.
+.claude/settings.local.json
+
+# Rendered from iam/*.json.template with the real account ID substituted in.
+# The template is the version-controlled source of truth; the rendered output
+# is local-only and must never be committed.
+iam/learn-sage-s3-policy.json

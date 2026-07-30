@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListTheProjectBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::learn-sage-ACCOUNT_ID"
+    },
+    {
+      "Sid": "ReadWriteProjectObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::learn-sage-ACCOUNT_ID/*"
+    }
+  ]
+}

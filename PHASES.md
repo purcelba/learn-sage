@@ -15,7 +15,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 | 4 — Deploy a real-time endpoint | ✅ complete (2026-07-30) — ~$0.006, endpoint deleted |
 | 5 — Batch Transform (optional) | ✅ complete (2026-07-30) — ~$0.01, self-terminating |
 | 6 — Teardown & hygiene | ✅ complete (2026-07-30) — `make aws-down` |
-| 7 — Map it back to LyftLearn (stretch) | ⬜ not started |
+| 7 — Map it back to LyftLearn (stretch) | 🟡 draft written — needs your edit |
 | 8 — Terraform (stretch) | ⬜ not started |
 
 ---
@@ -143,7 +143,7 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 **Goal:** convert hands-on AWS experience into Lyft-specific vocabulary.
 
-- [ ] Write yourself a short one-pager: which piece of what you just did maps to LyftLearn Compute (training), which maps to the model-registry-in-CI/CD concept, and — importantly — where the mapping *breaks down* at the serving step (SageMaker endpoint vs. LyftLearn Serving on Kubernetes).
+- [x] Write yourself a short one-pager: which piece of what you just did maps to LyftLearn Compute (training), which maps to the model-registry-in-CI/CD concept, and — importantly — where the mapping *breaks down* at the serving step (SageMaker endpoint vs. LyftLearn Serving on Kubernetes).
 - [ ] This becomes a good artifact to sanity-check with Ravi's team early on.
 
 ---

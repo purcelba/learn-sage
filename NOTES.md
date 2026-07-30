@@ -453,6 +453,129 @@ still bills, so an optimistic "done" would be wrong. First run said
 
 ---
 
+## Status: Phase 5 — COMPLETE (2026-07-30). Cost: ~$0.01. Self-terminating.
+
+Job `learn-sage-pctr-batch-model-2026-07-30-21-08-32-250`, `Completed`,
+`ml.m5.large`, ~4.5 min wall clock. No endpoint involved; nothing left running.
+
+| Criterion | Result |
+|---|---|
+| 1. Job completes, predictions in S3 | PASS — `predictions/test.csv.out`, 193 KiB |
+| 2. Batch vs. real-time articulation | see below |
+
+### The real result: an empty diff
+
+`git diff HEAD -- src/inference.py src/features.py` is **empty**. Both files are
+byte-identical to commit `eb58c6f`, which deployed the Phase 4 endpoint. The
+serving code carried no endpoint-specific assumptions — the same file served
+HTTP requests and a bulk file with no edits.
+
+The only difference between the two phases is the method called on an
+identically-constructed `SKLearnModel`: `.deploy()` versus `.transformer()`.
+
+Verification went past "a file appeared":
+
+- 10,000 predictions for 10,000 input rows
+- **max abs diff vs local scoring 5.6e-17**; 9,985 of 10,000 bit-identical
+- AUC recomputed from the batch output: **0.7322**, matching what `train.py`
+  logged during training
+- First three values match the Phase 4 endpoint exactly
+
+So training, the real-time endpoint, batch, and local scoring all agree. That's
+the feature-parity contract holding across every path.
+
+### I broke a Model between phases
+
+Phase 4's cleanup deleted `s3://<bucket>/code/` as "SDK scratch". **It is not
+scratch** — it is where a deployed Model's source permanently lives
+(`SAGEMAKER_SUBMIT_DIRECTORY`). The `learn-sage-pctr-model` object survived,
+still pointing at a tarball that no longer existed, and nothing anywhere
+reported the dangling reference.
+
+Extends the Phase 3 finding: `CreateModel` validates that `ModelDataUrl` exists,
+but evidently applies no such check to the submit directory. Two pointers, one
+checked.
+
+**Phase 6 hazard:** a teardown script that blanket-deletes `code/` silently
+breaks every Model in the account, and nothing surfaces it until the next job
+fails. Either keep `code/` or delete the Models that depend on it — the two are
+coupled, and treating one as disposable while keeping the other is what caused
+this.
+
+Fixed by having `batch_transform.py` construct its own `SKLearnModel` rather
+than reusing an artifact another phase happened to leave behind. Better design
+regardless: phases shouldn't depend on each other's incidental leftovers.
+
+### Coupling this phase surfaced (the point of the exercise)
+
+`input_fn` **requires a header row** for `text/csv`. Batch Transform can split
+input into line-chunks, and only the first chunk would carry the header — the
+rest would misparse silently as data. So the job ran with `split_type=None`:
+whole file as one payload, header intact. The container log confirms it — a
+single `POST /invocations` returning 197,824 bytes.
+
+That works here and does not scale: it caps input at `MaxPayloadInMB` (6 MB
+default, 100 max). A production handler would take headerless positional CSV
+with an explicit column list, or JSON Lines, and split freely.
+
+Naming this rather than hiding it, because surfacing exactly this sort of
+coupling is what the phase is for. `inference.py` is endpoint-agnostic —
+confirmed — but it is not payload-size-agnostic.
+
+### The `id` mistake, stated plainly
+
+Output is scores only, one per line, positionally aligned to the input. Keying
+them to records needs `join_source="Input"`, which needs line-splitting, which
+the header requirement rules out. The two constraints interact.
+
+It would not have helped anyway: **Phase 1 dropped the `id` column.** That was
+right for modelling — `id` is a row identifier, not a feature — but wrong for
+the pipeline, and the two got conflated. The production shape keeps the
+identifier in the file, uses `input_filter` to withhold it from the model, and
+`join_source` to re-attach it to the prediction. The identifier must travel with
+the data without entering the model.
+
+Not fixing it: regenerating the Phase 1 CSVs would modify completed work and
+break artifact lineage for a lesson already captured here. Cheap to learn now,
+expensive when a production job returns a million scores that can't be keyed
+back to anything.
+
+### Criterion 2 — batch vs. real-time
+
+**The question is not "how fast" but "do you know the inputs before the request
+arrives?"**
+
+Reach for **Batch Transform** when inputs are enumerable ahead of time: nightly
+scoring, email and push campaigns, daily recommendations, risk scores refreshed
+on a schedule, backfilling a new model version over history, or replaying logged
+traffic to compare a candidate model before shipping. It provisions, runs, and
+terminates — no idle cost, no capacity planning, no resource to forget. Cost is
+proportional to work done.
+
+Reach for a **real-time endpoint** when the input only exists at request time.
+Ad ranking is the canonical case: the candidate set depends on the request, so
+nothing can be precomputed. You pay for an always-on instance regardless of
+traffic, and that is the price of answering questions you couldn't anticipate.
+
+The economics differ in kind, not degree. Phase 4 cost ~$0.006 for ~30 requests
+and would have cost the same for zero. This job cost ~$0.01 for 10,000 rows and
+would cost nothing tomorrow if not run. **Endpoints bill for availability;
+batch bills for work.**
+
+Worth noting: our model is logistic regression, so it is additively separable —
+its score genuinely *could* be decomposed into per-user and per-ad partial dot
+products computed offline. That is why early ad systems were linear. The moment
+cross features or a hidden layer appear, separability is lost, and that is
+exactly the trade modern rankers make: give up cheap precomputation to buy the
+interactions that carry the accuracy.
+
+**This phase is the one that maps to Lyft.** Scheduled batch scoring is
+LyftLearn Compute's job, alongside training and notebooks. Phase 4's endpoint
+corresponds to nothing in their stack — LyftLearn Serving is Kubernetes. Of the
+two serving phases, the optional one is the realistic one.
+
+---
+
 ## Environment
 
 | Thing | Value |

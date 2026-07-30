@@ -13,7 +13,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 | 2 — Train a model on SageMaker | ✅ complete (2026-07-30) — cost $0.005 |
 | 3 — Register the model | ✅ complete (2026-07-30) — $0, metadata only |
 | 4 — Deploy a real-time endpoint | ✅ complete (2026-07-30) — ~$0.006, endpoint deleted |
-| 5 — Batch Transform (optional) | ⬜ not started |
+| 5 — Batch Transform (optional) | ✅ complete (2026-07-30) — ~$0.01, self-terminating |
 | 6 — Teardown & hygiene | ⬜ not started |
 | 7 — Map it back to LyftLearn (stretch) | ⬜ not started |
 | 8 — Terraform (stretch) | ⬜ not started |
@@ -113,15 +113,15 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 ---
 
-## Phase 5 (optional) — Batch Transform ⬜
+## Phase 5 (optional) — Batch Transform ✅
 
 **Goal:** the other offline pattern — batch prediction without a persistent endpoint, closer to how LyftLearn Compute would run scheduled scoring jobs.
 
-- [ ] Run a SageMaker Batch Transform job against your held-out `test.csv`, writing predictions back to S3. No endpoint stays up. It reuses the same `inference.py` as Phase 4 — a useful confirmation that your serving code isn't secretly endpoint-specific.
+- [x] Run a SageMaker Batch Transform job against your held-out `test.csv`, writing predictions back to S3. No endpoint stays up. It reuses the same `inference.py` as Phase 4 — a useful confirmation that your serving code isn't secretly endpoint-specific.
 
 **Acceptance criteria:**
-- [ ] 1. Batch Transform job completes; predictions file appears in S3.
-- [ ] 2. You can articulate when you'd reach for this vs. a real-time endpoint (latency need vs. throughput/cost).
+- [x] 1. Batch Transform job completes; predictions file appears in S3.
+- [x] 2. You can articulate when you'd reach for this vs. a real-time endpoint (latency need vs. throughput/cost).
 
 ---
 

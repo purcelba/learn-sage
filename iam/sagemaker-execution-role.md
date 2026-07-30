@@ -14,9 +14,9 @@ S3 while your CLI reads the exact same bucket perfectly. Nothing is wrong with
 your credentials — the container isn't using them. Two principals, two sets of
 permissions.
 
-At Lyft the equivalent role is platform-owned; you'd never create it. Knowing it
-exists is what lets you tell "my job is broken" from "the platform's role is
-misconfigured."
+In a company with a platform team, the equivalent role is platform-owned and
+you would never create it yourself. Knowing it exists is what lets you tell "my
+job is broken" from "the platform's role is misconfigured."
 
 ## The role name is NOT arbitrary
 

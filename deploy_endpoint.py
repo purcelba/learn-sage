@@ -8,11 +8,12 @@ one request an hour or none at all. ml.t2.medium is ~$0.065/hr = ~$1.56/day =
 ~$47/month, against a $15 budget. Delete it as soon as the phase's criteria
 pass -- `python teardown_endpoint.py --confirm`.
 
-## Why this is NOT how Lyft serves models
+## Why many orgs do NOT serve models this way
 
-LyftLearn Serving runs on Kubernetes; only LyftLearn Compute (training, batch,
-notebooks) maps to SageMaker. What this script demonstrates is precisely why
-that choice gets made: one always-on instance, dedicated to one model, idle most
+Plenty of companies run training and batch scoring on SageMaker while serving
+real-time traffic from their own Kubernetes cluster. What this script
+demonstrates is precisely why that choice gets made: one always-on instance,
+dedicated to one model, idle most
 of the time, billing regardless. Fifty models means fifty instances. A shared
 Kubernetes cluster amortizes capacity across all of them and can scale down
 between requests. The endpoint below is the thing that tradeoff is measured

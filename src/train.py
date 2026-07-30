@@ -9,8 +9,8 @@ this file as `python train.py --arg ...`, then tars whatever landed in
 
 This script owns all of it: which columns are features, how they're encoded,
 what model is fit, and how it's evaluated. That split is the point -- the
-platform runs the job, the team owns what runs. Same division as LyftLearn
-Compute.
+platform runs the job, the team owns what runs. It is the same division most
+internal ML platforms draw.
 
 The paths below are the interface between the two. SageMaker sets them as
 environment variables inside the container; the argparse defaults read those,

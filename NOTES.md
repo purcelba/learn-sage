@@ -286,10 +286,10 @@ refuses anything not `Approved`. Miss the fourth and "Approved" means somebody
 set a string. Automating the third-to-fourth link is SageMaker Pipelines'
 `ConditionStep` — different machinery, out of scope here.
 
-**The distinction that matters for an ads-ranking manager:** "we have a model
-registry" and "we have an enforced quality gate" are different claims. Worth
-asking Ravi's team where LyftLearn's enforcement actually lives — automated
-threshold in CI, or a human reading a dashboard.
+**The distinction that matters:** "we have a model registry" and "we have an
+enforced quality gate" are different claims. Worth asking, of any real platform,
+where enforcement actually lives — an automated threshold in CI, or a human
+reading a dashboard.
 
 ### The image is pinned to the one that produced the artifact
 
@@ -374,7 +374,7 @@ showed — and only if someone thought to check.
 An endpoint returning 0.34 looks identical whether or not it agrees with
 training. Only the comparison tells you.
 
-### Criterion 3 — the cost driver, and why Lyft doesn't do this
+### Criterion 3 — the cost driver, and why many orgs avoid this pattern
 
 **The cost driver is the instance, not the traffic.** `ml.t2.medium` bills
 ~$0.065/hr — ~$1.56/day, ~$47/month — from InService until deleted, whether it
@@ -391,8 +391,8 @@ Three consequences that scale badly:
 3. **You pay for peak, continuously.** Sizing for the busy hour means
    overpaying for the other 23.
 
-**How Kubernetes-based serving differs** — and this is why LyftLearn Serving is
-on Kubernetes rather than SageMaker endpoints:
+**How Kubernetes-based serving differs** — and this is why many organizations
+serve from their own cluster rather than SageMaker endpoints:
 
 - **Bin-packing.** Many models share a node pool. A small model gets a pod, not
   a machine; 50 models may fit on a handful of nodes.
@@ -405,12 +405,13 @@ on Kubernetes rather than SageMaker endpoints:
 
 The tradeoff SageMaker endpoints buy in exchange: no cluster to operate. For one
 model, or a team without platform engineers, that's a genuinely good deal — it's
-why this phase is worth doing. At Lyft's scale, with a platform team already
-running Kubernetes, the arithmetic inverts.
+why this phase is worth doing. At scale, with a platform team already running
+Kubernetes, the arithmetic inverts.
 
-**Restating the standing caveat: Phase 4 is not the Lyft path.** Only LyftLearn
-Compute (training, batch, notebooks) maps to SageMaker. Phase 5's Batch
-Transform is much closer to how LyftLearn would run scheduled scoring.
+**Restating the standing caveat: Phase 4 is not how most large orgs serve.**
+Typically only the offline half (training, batch, notebooks) maps to SageMaker.
+Phase 5's Batch Transform is much closer to how a platform would run scheduled
+scoring.
 
 ### The bid-agnostic boundary, demonstrated
 
@@ -569,10 +570,10 @@ cross features or a hidden layer appear, separability is lost, and that is
 exactly the trade modern rankers make: give up cheap precomputation to buy the
 interactions that carry the accuracy.
 
-**This phase is the one that maps to Lyft.** Scheduled batch scoring is
-LyftLearn Compute's job, alongside training and notebooks. Phase 4's endpoint
-corresponds to nothing in their stack — LyftLearn Serving is Kubernetes. Of the
-two serving phases, the optional one is the realistic one.
+**This phase is the one that maps to a real platform.** Scheduled batch scoring
+is the offline platform's job, alongside training and notebooks. Phase 4's
+endpoint often corresponds to nothing in such a stack, where serving runs on
+Kubernetes. Of the two serving phases, the optional one is the realistic one.
 
 ---
 
@@ -743,9 +744,10 @@ one. Removing a file from git history does not un-leak a pushed secret.
 
 ---
 
-## Reminder: the serving phase is not the Lyft path
+## Reminder: the serving phase is not how most orgs serve
 
 Per `CLAUDE.md` — Phase 4's SageMaker real-time endpoint teaches genuine AWS
-deployment mechanics but is **not** how Lyft serves models. LyftLearn Serving
-runs on Kubernetes; only LyftLearn Compute (training, batch, notebooks) maps to
-SageMaker. Keep that distinction live rather than noting it once.
+deployment mechanics but is **not** how many organizations serve models. Online
+serving frequently runs on Kubernetes; typically only the offline half
+(training, batch, notebooks) maps to SageMaker. Keep that distinction live
+rather than noting it once.

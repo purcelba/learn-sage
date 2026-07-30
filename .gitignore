@@ -54,5 +54,5 @@ iam/learn-sage-s3-policy.json
 # uses one: it is harder to get wrong. Anything personal goes in private/ and is
 # ignored automatically, with no need to remember to add a rule first.
 #
-# Holds the Phase 7 LyftLearn write-up.
+# Holds the Phase 7 write-up.
 private/

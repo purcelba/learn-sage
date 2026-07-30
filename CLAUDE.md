@@ -1,14 +1,14 @@
 # CLAUDE.md — SageMaker Warm-Up
 
-This repo is a small, cheap learning project: train and serve a pCTR (predicted click-through rate) model on AWS SageMaker, using the Avazu CTR dataset, to get hands-on with AWS/SageMaker basics before starting a role managing an ads-ranking team. The build plan lives in `PHASES.md`. This is deliberately scoped small — clarity and understanding *why* each AWS primitive exists matter more than build speed or completeness.
+This repo is a small, cheap learning project: train and serve a pCTR (predicted click-through rate) model on AWS SageMaker, using the Avazu CTR dataset, to get hands-on with AWS/SageMaker basics. The build plan lives in `PHASES.md`. This is deliberately scoped small — clarity and understanding *why* each AWS primitive exists matter more than build speed or completeness.
 
 ## Why this project exists
 
-Lyft's ML platform, LyftLearn, splits into two halves:
-- **LyftLearn Compute (offline)** — training, batch prediction, notebooks. Runs on **AWS SageMaker**.
-- **LyftLearn Serving (online)** — real-time inference. Runs on **Kubernetes**, *not* SageMaker endpoints.
+A common shape for an internal ML platform splits it into two halves:
+- **Offline** — training, batch prediction, notebooks. Often runs on **AWS SageMaker**.
+- **Online** — real-time inference. Frequently runs on **Kubernetes**, *not* SageMaker endpoints.
 
-So the real-time endpoint phase here (Phase 4) teaches genuine SageMaker/AWS deployment mechanics, but is **not** how Lyft serves models in production. Don't let it get treated as "this is my team's serving path" — it isn't. Flag this distinction anywhere it's relevant, not just once.
+So the real-time endpoint phase here (Phase 4) teaches genuine SageMaker/AWS deployment mechanics, but is **not** how many organizations serve models in production. Don't let it get treated as "this is the standard serving path" — it isn't. Flag this distinction anywhere it's relevant, not just once.
 
 ## Standing workflow rules
 
@@ -24,7 +24,7 @@ So the real-time endpoint phase here (Phase 4) teaches genuine SageMaker/AWS dep
 ## Contracts digest (locked decisions)
 
 - **Dataset:** Avazu CTR Prediction, 50k-row Kaggle sample — not the full ~40M-row file. `click` is the label; `id` is dropped (not a feature).
-- **Model:** `sklearn.linear_model.LogisticRegression`. Not XGBoost, not a built-in SageMaker algorithm — a custom script the project owns, because that's analogous to what a DS/MLE team actually owns at Lyft (vs. platform-provided infra).
+- **Model:** `sklearn.linear_model.LogisticRegression`. Not XGBoost, not a built-in SageMaker algorithm — a custom script the project owns, because that's analogous to what a DS/MLE team actually owns (vs. platform-provided infra).
 - **Training/serving split:** `train.py` and `inference.py` are the two owned artifacts. SageMaker's SKLearn framework container is generic infra underneath both — don't conflate "the container" with "the model."
 - **Feature parity:** the fitted encoder from `train.py` must be saved alongside the model and reused unchanged in `inference.py`. Training and serving must never diverge on how a raw column becomes a feature — this is the same training/serving-skew concern as a real feature store.
 - **Model inputs**, grouped (see PHASES.md Phase 2 for the full table):

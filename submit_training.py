@@ -5,8 +5,8 @@ here is instructions *to* SageMaker: which container, which instance, where the
 data is, where to put the result. None of it is machine learning -- all of that
 lives in src/train.py and src/features.py.
 
-At Lyft this layer is roughly what LyftLearn Compute provides; a DS/MLE team
-writes the training script and the platform handles submission, provisioning,
+This layer is roughly what an internal ML platform provides: a DS/MLE team
+writes the training script, and the platform handles submission, provisioning,
 and artifact capture.
 
 Costs money. Guarded behind --confirm.

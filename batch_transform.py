@@ -2,8 +2,8 @@
 
 The other offline pattern. Like a training job and unlike an endpoint, a
 Transform job provisions, runs, and terminates itself -- there is nothing to
-forget to delete. This is much closer to how LyftLearn Compute would run a
-scheduled scoring job than Phase 4's endpoint is.
+forget to delete. This is much closer to how a platform would run a scheduled
+scoring job than Phase 4's endpoint is.
 
 ## What this is really testing
 

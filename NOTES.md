@@ -328,6 +328,131 @@ That SageMaker happily created an unservable Model is the phase's real lesson:
 
 ---
 
+## Status: Phase 4 — COMPLETE (2026-07-30). Cost: ~$0.006. Endpoint DELETED.
+
+Live window: provisioning 16:25:37 → InService 16:30:41 → deleted 16:31:14.
+About 5.5 minutes on `ml.t2.medium` at ~$0.065/hr.
+
+| Criterion | Result |
+|---|---|
+| 1. Probability-shaped, responsive to inputs | PASS — 0.0218 baseline; `banner_pos` 0→7 moves it 0.0218→0.0345 |
+| 2. Endpoint matches local scoring | PASS — **max abs diff 3.5e-18** over 10 rows |
+| 3. Cost driver, and the Kubernetes contrast | see below |
+| 4. Ranking responds to bid *and* ad features | PASS — 3 auctions |
+
+### Deviation: ml.t2.medium, not ml.t3.medium
+
+`ml.t3.medium` **is not a supported real-time endpoint instance type.**
+`CreateEndpointConfig` rejects it outright — and that also finally explains the
+missing quota: there's no `ml.t3.medium for endpoint usage` entry in Service
+Quotas because the instance isn't offered for endpoints at all. Earlier I
+reasoned "not listed, therefore untracked, therefore fine." Wrong inference;
+the right one was "not listed, therefore find out why."
+
+The rejection was free (validation precedes provisioning), consistent with the
+quota rejections in Phase 2. Supported small types are `ml.t2.medium`,
+`ml.t2.large`, `ml.m5.large`. Chose `ml.t2.medium`: same burstable family, one
+generation older, cheaper than m5.large.
+
+Side effect worth knowing: the failed deploy still created a `Model` object
+before validation failed, which then collided on retry. Deleted it manually.
+`.deploy()` creates Model → EndpointConfig → Endpoint in sequence, so a
+mid-sequence failure leaves earlier objects behind.
+
+### Criterion 2 is the one that matters, and it passed hard
+
+**Max absolute difference 3.5e-18** between endpoint and local scoring across 10
+rows — 9 of 10 bit-identical. That's despite genuinely different runtimes:
+container Python 3.10.20 / numpy 2.1.0, local Python 3.12.13 / numpy 2.5.1.
+
+That result is *earned*, not lucky. It follows from `source_dir="src"` shipping
+`features.py` into the container, so serving imports the same module training
+did rather than a copy. Had `inference.py` reimplemented tokenisation "just to
+keep serving self-contained," this number would be the first place the drift
+showed — and only if someone thought to check.
+
+An endpoint returning 0.34 looks identical whether or not it agrees with
+training. Only the comparison tells you.
+
+### Criterion 3 — the cost driver, and why Lyft doesn't do this
+
+**The cost driver is the instance, not the traffic.** `ml.t2.medium` bills
+~$0.065/hr — ~$1.56/day, ~$47/month — from InService until deleted, whether it
+serves a million requests or zero. We sent roughly 30 requests total. The
+per-request cost was absurd; the per-hour cost was the same as if we'd sent
+none.
+
+Three consequences that scale badly:
+
+1. **Cost is per model, not per request.** 50 models = 50 always-on instances,
+   each sized for that model's peak, each idle most of the time.
+2. **Utilisation is invisible.** Nothing in the bill distinguishes a saturated
+   endpoint from an idle one.
+3. **You pay for peak, continuously.** Sizing for the busy hour means
+   overpaying for the other 23.
+
+**How Kubernetes-based serving differs** — and this is why LyftLearn Serving is
+on Kubernetes rather than SageMaker endpoints:
+
+- **Bin-packing.** Many models share a node pool. A small model gets a pod, not
+  a machine; 50 models may fit on a handful of nodes.
+- **Elasticity.** HPA scales replicas with load; cluster autoscaler adds and
+  removes nodes. Capacity follows demand instead of being pinned to peak.
+- **One platform, not one per model.** Rollouts, canaries, mTLS, tracing,
+  service mesh, on-call runbooks — shared infrastructure every model inherits,
+  rather than per-endpoint configuration.
+- **No AWS-managed-service premium** on top of the compute.
+
+The tradeoff SageMaker endpoints buy in exchange: no cluster to operate. For one
+model, or a team without platform engineers, that's a genuinely good deal — it's
+why this phase is worth doing. At Lyft's scale, with a platform team already
+running Kubernetes, the arithmetic inverts.
+
+**Restating the standing caveat: Phase 4 is not the Lyft path.** Only LyftLearn
+Compute (training, batch, notebooks) maps to SageMaker. Phase 5's Batch
+Transform is much closer to how LyftLearn would run scheduled scoring.
+
+### The bid-agnostic boundary, demonstrated
+
+`rank_candidates.py` sends the endpoint raw ad rows and receives pCTR. It never
+sends a bid. Every multiplication, comparison and sort happens caller-side.
+
+Auction 1: `footer` wins at 0.1653 (bid $4.00 x pCTR 0.0413) despite *not*
+having the highest pCTR — `top-banner` scores 0.0572 but only bids $2.50. That's
+the mechanic in one line: neither pure relevance nor pure willingness-to-pay
+wins, the product does.
+
+Auction 2 (only a bid changed): `interstitial` goes last → first on a $12 bid,
+with pCTR unchanged at 0.0345. Auction 3 (only ad features changed): moving
+`interstitial` to `banner_pos=1` drops its pCTR 0.0345 → 0.0247, no bid change.
+Ordering responds to both levers, independently.
+
+Why the boundary is worth defending: the model can be retrained or replaced
+without touching auction logic; reserve prices and pacing can change hourly
+without retraining; and pCTR stays interpretable as a probability. Train
+directly against revenue and you can no longer ask "is this calibrated?" —
+which is what makes `bid x pCTR` mean anything.
+
+### Models kept on purpose
+
+`learn-sage-pctr-model` (bound to `inference.py`) is retained — Phase 5's Batch
+Transform needs exactly that binding. `learn-sage-pctr-2026-07-30-19-35-01-384`
+is the Phase 3 object. Both are metadata, $0.
+
+### Teardown written before deploy
+
+`teardown_endpoint.py` was written and exercised *before* `deploy_endpoint.py`
+ever ran, so the means to stop billing existed before the billing did. It
+deletes the endpoint **and** the endpoint config — deleting only the endpoint
+leaves a config behind, which is free but makes "no endpoints listed" a
+misleading all-clear.
+
+It also refuses to report success while an endpoint is in `Deleting`: that state
+still bills, so an optimistic "done" would be wrong. First run said
+`STILL DELETING`; a second confirmed `none`.
+
+---
+
 ## Environment
 
 | Thing | Value |

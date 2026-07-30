@@ -12,7 +12,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 | 1 — Data | ✅ complete (2026-07-29) |
 | 2 — Train a model on SageMaker | ✅ complete (2026-07-30) — cost $0.005 |
 | 3 — Register the model | ✅ complete (2026-07-30) — $0, metadata only |
-| 4 — Deploy a real-time endpoint | ⬜ not started |
+| 4 — Deploy a real-time endpoint | ✅ complete (2026-07-30) — ~$0.006, endpoint deleted |
 | 5 — Batch Transform (optional) | ⬜ not started |
 | 6 — Teardown & hygiene | ⬜ not started |
 | 7 — Map it back to LyftLearn (stretch) | ⬜ not started |
@@ -96,20 +96,20 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 ---
 
-## Phase 4 — Deploy a real-time endpoint ⬜
+## Phase 4 — Deploy a real-time endpoint ✅
 
 **Goal:** feel what "always-on inference infra" costs and requires — this is the part LyftLearn deliberately keeps off SageMaker in production, so pay attention to *why* it might.
 
-- [ ] Because Phase 2 used a custom script rather than a built-in algorithm, serving needs its own small `inference.py` alongside `train.py`: a `model_fn` (load your joblib model + encoder), `input_fn`/`output_fn` (parse the request, format the response), and `predict_fn` (encode inputs using the *same* fitted encoder from training, then call `model.predict_proba`). This pairing — training code and serving code sharing the same encoder artifact — is the same feature-parity discipline your ad server project's registry-as-contract is built around, just at a much smaller scale.
-- [ ] Deploy to a small instance type (`ml.t3.medium`) — or use **Serverless Inference** if you want to see the cheaper, newer alternative (no idle cost, cold-start latency instead).
-- [ ] Invoke the endpoint via `boto3` (`invoke_endpoint`) with a held-out test row and confirm a sane pCTR score (a probability between 0 and 1) comes back.
-- [ ] **Toy auction service:** write a small local script (`rank_candidates.py`) that plays the caller's role rather than the model's — the model endpoint should never know about bids or auctions. Take N candidate rows (a mini candidate set — vary a couple of ad-side fields like `banner_pos` or `site_category` across them, holding user/context fields fixed to simulate "same request, different candidate ads"), call `invoke_endpoint` once per candidate (or as a batch if your `inference.py` supports it) to get pCTR per candidate, assign each candidate a fake `bid` value, compute `bid × pCTR`, sort, and print the ranked list with the winner on top. This is the actual mechanic underneath ads ranking — scoring and ranking are separate concerns, and this script is where they're deliberately stitched together *outside* the model artifact.
+- [x] Because Phase 2 used a custom script rather than a built-in algorithm, serving needs its own small `inference.py` alongside `train.py`: a `model_fn` (load your joblib model + encoder), `input_fn`/`output_fn` (parse the request, format the response), and `predict_fn` (encode inputs using the *same* fitted encoder from training, then call `model.predict_proba`). This pairing — training code and serving code sharing the same encoder artifact — is the same feature-parity discipline your ad server project's registry-as-contract is built around, just at a much smaller scale.
+- [x] Deploy to a small instance type (`ml.t3.medium`) — or use **Serverless Inference** if you want to see the cheaper, newer alternative (no idle cost, cold-start latency instead).
+- [x] Invoke the endpoint via `boto3` (`invoke_endpoint`) with a held-out test row and confirm a sane pCTR score (a probability between 0 and 1) comes back.
+- [x] **Toy auction service:** write a small local script (`rank_candidates.py`) that plays the caller's role rather than the model's — the model endpoint should never know about bids or auctions. Take N candidate rows (a mini candidate set — vary a couple of ad-side fields like `banner_pos` or `site_category` across them, holding user/context fields fixed to simulate "same request, different candidate ads"), call `invoke_endpoint` once per candidate (or as a batch if your `inference.py` supports it) to get pCTR per candidate, assign each candidate a fake `bid` value, compute `bid × pCTR`, sort, and print the ranked list with the winner on top. This is the actual mechanic underneath ads ranking — scoring and ranking are separate concerns, and this script is where they're deliberately stitched together *outside* the model artifact.
 
 **Acceptance criteria:**
-- [ ] 1. `invoke_endpoint` returns a probability-shaped prediction (0–1) that moves sensibly when you vary an input feature you'd expect to matter (e.g. `banner_pos`).
-- [ ] 2. The prediction matches what you'd get running the same row through your model + encoder locally — confirming training/serving parity, not just "an endpoint responds."
-- [ ] 3. You can name the ongoing cost driver (an always-on instance) and contrast it with how Kubernetes-based serving amortizes cost differently across many models — this contrast is the actual learning goal of this phase.
-- [ ] 4. `rank_candidates.py` prints a ranked candidate list where the ordering changes sensibly when you change either a candidate's simulated bid or its ad-side features — confirming the ranking logic actually depends on both inputs, not just one.
+- [x] 1. `invoke_endpoint` returns a probability-shaped prediction (0–1) that moves sensibly when you vary an input feature you'd expect to matter (e.g. `banner_pos`).
+- [x] 2. The prediction matches what you'd get running the same row through your model + encoder locally — confirming training/serving parity, not just "an endpoint responds."
+- [x] 3. You can name the ongoing cost driver (an always-on instance) and contrast it with how Kubernetes-based serving amortizes cost differently across many models — this contrast is the actual learning goal of this phase.
+- [x] 4. `rank_candidates.py` prints a ranked candidate list where the ordering changes sensibly when you change either a candidate's simulated bid or its ad-side features — confirming the ranking logic actually depends on both inputs, not just one.
 
 ---
 

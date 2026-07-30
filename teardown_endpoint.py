@@ -1,5 +1,13 @@
 """Delete the endpoint and everything that hangs off it.
 
+SUPERSEDED IN PHASE 6 by `aws_down.py` / `make aws-down`, which does everything
+this does plus sweeps all three regions this project has touched, stops running
+jobs, checks for Studio domains, and distinguishes what bills from what is free
+metadata. Prefer that.
+
+Kept rather than deleted because it is a Phase 4 artifact and the phase is
+complete; it still works for the single-region endpoint case.
+
 Written BEFORE deploy_endpoint.py was ever run, deliberately: the way to stop
 billing should exist before the billing starts.
 

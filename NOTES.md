@@ -576,6 +576,91 @@ two serving phases, the optional one is the realistic one.
 
 ---
 
+## Status: Phase 6 — criterion 1 PASS, criterion 2 pending console check
+
+| Criterion | Result |
+|---|---|
+| 1. `list-endpoints` returns empty | PASS — `[]` in us-east-1, us-west-2, us-east-2 |
+| 2. Spend well under budget | pending — needs a browser check (see below) |
+
+`make aws-down` is the one command. `make aws-status` is the read-only version,
+which is the right thing to run before closing the laptop.
+
+### Total project spend: ~$0.02 of $15 (0.15%)
+
+| | seconds | instance | cost |
+|---|---|---|---|
+| training (4 jobs, 3 failed) | 227 | ml.m5.large | $0.0073 |
+| endpoint | 330 | ml.t2.medium | $0.0060 |
+| batch transform | ≤270 | ml.m5.large | ≤$0.0086 |
+| S3 (~7 MB) | — | — | ~$0.0002/mo |
+
+Transform is an upper bound: the job's own start→end span was 73s, but SageMaker
+bills instance time including provisioning, so actual is $0.002–$0.009.
+
+Criterion 2 can't be checked from the CLI — **both** `budgets:ViewBudget` and
+`ce:GetCostAndUsage` are denied to `learn-sage-dev`. That's the Phase 0
+least-privilege scoping still holding, same as it did in Phase 0 itself. Don't
+widen the user to make a check convenient.
+
+### The bug the free test found
+
+`aws_down.py` initially gated cleanup behind `if billing:`. Endpoint configs are
+free, so whenever nothing happened to be billing the cleanup was **skipped
+entirely** — and the script then printed `CLEAN` with a stale config listed
+directly above it in the same output. Technically true about billing, and
+thoroughly misleading.
+
+Found by creating a throwaway endpoint config (free — no instance) and watching
+`make aws-down` fail to delete it. A teardown script that has only ever reported
+"0 billing" is unproven; it has to be shown deleting something.
+
+This is the third time in this project that a green result meant nothing until
+something was made to fail: Phase 1's IAM scoping, Phase 3's registry
+validation, now this. **The pattern is the lesson.**
+
+Fixed twice over: cleanup now runs unconditionally under `--confirm`, and the
+final verdict distinguishes "nothing is billing" from "nothing is stale."
+
+### Teardown means stopping the billing, not deleting the project
+
+`make aws-down` keeps the bucket, the IAM role and policies, the model artifact,
+the predictions, the registry, and the Models. All are free or ~$0.0002/month.
+
+Deliberate: **Phase 8 imports exactly the resources that survive this script**,
+and the observation that those are precisely the resources belonging in
+Terraform is that phase's organizing idea. A teardown that nuked the bucket
+would delete Phase 8's subject matter along with Phase 1's data.
+
+`make aws-purge` exists for genuinely finishing, and is not run.
+
+### Hazards the script handles, each learned by hitting it
+
+1. **`code/` is coupled to Models.** Purging deletes the Models *first*, because
+   removing `s3://<bucket>/code/` while a Model references it leaves the Model
+   intact but silently broken — exactly what I did between Phases 4 and 5.
+2. **Deletion is asynchronous.** An endpoint in `Deleting` still bills, so the
+   script polls until the count is actually zero rather than trusting that the
+   API call returned.
+3. **Resources hide in other regions.** The Phase 2 quota hunt touched
+   us-west-2 and us-east-2. A single-region teardown would miss anything
+   stranded there.
+4. **Studio domains.** Checked but not auto-deleted — removing one requires
+   deleting user profiles, apps and spaces first, which is too destructive to do
+   implicitly. It reports loudly instead. None exist; the check is there because
+   an EFS volume is the classic thing a teardown written before it existed will
+   not know to look for.
+
+### `teardown_endpoint.py` superseded (flagged per rule 6)
+
+Phase 4's script is superseded by `aws_down.py`, which does everything it did
+plus multi-region sweep, job stopping, Studio detection, and the
+bills-vs-free distinction. Kept rather than deleted — it is a completed phase's
+artifact and still works for the single-region case — with a pointer added at
+the top of its docstring. That docstring edit is the only change to Phase 4 code.
+
+---
+
 ## Environment
 
 | Thing | Value |

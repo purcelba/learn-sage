@@ -47,3 +47,12 @@ credentials
 # The template is the version-controlled source of truth; the rendered output
 # is local-only and must never be committed.
 iam/learn-sage-s3-policy.json
+
+# Personal notes — local only, deliberately NOT in the public repo.
+#
+# A directory rule rather than per-file patterns, for the same reason secrets/
+# uses one: it is harder to get wrong. Anything personal goes in private/ and is
+# ignored automatically, with no need to remember to add a rule first.
+#
+# Holds the Phase 7 LyftLearn write-up.
+private/

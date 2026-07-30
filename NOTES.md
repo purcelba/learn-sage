@@ -576,12 +576,12 @@ two serving phases, the optional one is the realistic one.
 
 ---
 
-## Status: Phase 6 — criterion 1 PASS, criterion 2 pending console check
+## Status: Phase 6 — COMPLETE (2026-07-30)
 
 | Criterion | Result |
 |---|---|
 | 1. `list-endpoints` returns empty | PASS — `[]` in us-east-1, us-west-2, us-east-2 |
-| 2. Spend well under budget | pending — needs a browser check (see below) |
+| 2. Spend well under budget | PASS — `$0.00 of $15.00`, thresholds OK (screenshot) |
 
 `make aws-down` is the one command. `make aws-status` is the read-only version,
 which is the right thing to run before closing the laptop.
@@ -597,6 +597,10 @@ which is the right thing to run before closing the laptop.
 
 Transform is an upper bound: the job's own start→end span was 73s, but SageMaker
 bills instance time including provisioning, so actual is $0.002–$0.009.
+
+The console `$0.00` partly reflects the ~24h Budgets lag, since all compute ran
+the same day. The billable-seconds arithmetic above (~$0.02) is the stronger
+evidence; both agree it is far under budget.
 
 Criterion 2 can't be checked from the CLI — **both** `budgets:ViewBudget` and
 `ce:GetCostAndUsage` are denied to `learn-sage-dev`. That's the Phase 0

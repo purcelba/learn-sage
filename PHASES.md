@@ -14,7 +14,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 | 3 — Register the model | ✅ complete (2026-07-30) — $0, metadata only |
 | 4 — Deploy a real-time endpoint | ✅ complete (2026-07-30) — ~$0.006, endpoint deleted |
 | 5 — Batch Transform (optional) | ✅ complete (2026-07-30) — ~$0.01, self-terminating |
-| 6 — Teardown & hygiene | 🟡 criteria 1 done; criterion 2 needs a console check |
+| 6 — Teardown & hygiene | ✅ complete (2026-07-30) — `make aws-down` |
 | 7 — Map it back to LyftLearn (stretch) | ⬜ not started |
 | 8 — Terraform (stretch) | ⬜ not started |
 
@@ -125,7 +125,7 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 ---
 
-## Phase 6 — Teardown & hygiene ⬜
+## Phase 6 — Teardown & hygiene ✅
 
 **Goal:** nothing keeps billing after you stop working.
 
@@ -135,7 +135,7 @@ All of these get encoded into a single numeric feature vector per row; that vect
 
 **Acceptance criteria:**
 - [x] 1. `aws sagemaker list-endpoints` returns empty.
-- [ ] 2. Billing alarm shows spend well under your budget.
+- [x] 2. Billing alarm shows spend well under your budget.
 
 ---
 

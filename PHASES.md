@@ -10,7 +10,7 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 |---|---|
 | 0 — AWS account setup & guardrails | ✅ complete (2026-07-29) |
 | 1 — Data | ✅ complete (2026-07-29) |
-| 2 — Train a model on SageMaker | ⬜ not started — **first phase with real compute cost** |
+| 2 — Train a model on SageMaker | ✅ complete (2026-07-30) — cost $0.005 |
 | 3 — Register the model | ⬜ not started |
 | 4 — Deploy a real-time endpoint | ⬜ not started |
 | 5 — Batch Transform (optional) | ⬜ not started |
@@ -53,15 +53,15 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 
 ---
 
-## Phase 2 — Train a model on SageMaker (custom script) ⬜
+## Phase 2 — Train a model on SageMaker (custom script) ✅
 
 **Goal:** run your own training code as a SageMaker Training Job, not a black-box algorithm — this is the part that's actually analogous to what your team will own at Lyft (a model your DS/MLE org writes and is accountable for, running on shared training infra).
 
-- [ ] Write a small `train.py`: reads `train.csv`/`test.csv` from the SageMaker-provided input channels, does the categorical encoding (one-hot or hashing — a hashing trick is worth doing here specifically, since it's what production ads systems use for high-cardinality, unbounded categorical fields like `site_id`), fits **`sklearn.linear_model.LogisticRegression`**, evaluates on the test set, and writes the fitted model (and the fitted encoder, so serving doesn't silently diverge from training — the same training/serving-skew problem your feature store notes flagged) to `/opt/ml/model` via `joblib`.
-- [ ] Use the `sagemaker` SDK's `SKLearn` estimator (framework/script mode: you supply `train.py`, SageMaker supplies the container). Pass hyperparameters as CLI args your script parses with `argparse`.
-- [ ] Kick off the job with `estimator.fit({'train': ..., 'test': ...})`, watch it provision, run, and terminate.
-- [ ] Note where the model artifact lands: `s3://<bucket>/output/.../model.tar.gz` — this now contains *your* joblib-dumped model and encoder, not a SageMaker-native format.
-- [ ] Create the SageMaker **execution role** the training job runs as. This is a different principal from `learn-sage-dev` — the user submits the job, the role is what the container actually runs as — so it needs its own S3 access to the project bucket. Flagged during Phase 1; see `iam/README.md`.
+- [x] Write a small `train.py`: reads `train.csv`/`test.csv` from the SageMaker-provided input channels, does the categorical encoding (one-hot or hashing — a hashing trick is worth doing here specifically, since it's what production ads systems use for high-cardinality, unbounded categorical fields like `site_id`), fits **`sklearn.linear_model.LogisticRegression`**, evaluates on the test set, and writes the fitted model (and the fitted encoder, so serving doesn't silently diverge from training — the same training/serving-skew problem your feature store notes flagged) to `/opt/ml/model` via `joblib`.
+- [x] Use the `sagemaker` SDK's `SKLearn` estimator (framework/script mode: you supply `train.py`, SageMaker supplies the container). Pass hyperparameters as CLI args your script parses with `argparse`.
+- [x] Kick off the job with `estimator.fit({'train': ..., 'test': ...})`, watch it provision, run, and terminate.
+- [x] Note where the model artifact lands: `s3://<bucket>/output/.../model.tar.gz` — this now contains *your* joblib-dumped model and encoder, not a SageMaker-native format.
+- [x] Create the SageMaker **execution role** the training job runs as. This is a different principal from `learn-sage-dev` — the user submits the job, the role is what the container actually runs as — so it needs its own S3 access to the project bucket. Flagged during Phase 1; see `iam/README.md`.
 
 **Model inputs.** Every Avazu column except `click` (the label) and `id` (a row identifier, not a feature) goes in, mapped onto the same user/ad/context grouping your ad server spec uses:
 
@@ -75,11 +75,11 @@ Phased build spec. Work one phase at a time, in order; `CLAUDE.md` holds the sta
 All of these get encoded into a single numeric feature vector per row; that vector is the actual input to `LogisticRegression` — there's no separate "user model" or "ad model," just one flat vector combining all three groups, which is the simplest version of the "cross features" idea from your ad server spec (in a fuller system, interactions between user and ad groups would be engineered explicitly rather than left for logistic regression to find linearly).
 
 **Acceptance criteria:**
-- [ ] 1. Training job shows `Completed` in the console and in `describe_training_job`.
-- [ ] 2. `model.tar.gz` exists in S3 and, unpacked, contains your model and encoder artifacts.
-- [ ] 3. Your script prints validation AUC to the training logs, meaningfully above 0.5 — your pCTR model is actually discriminating clicks from non-clicks, not just running.
-- [ ] 4. You can list the model's input columns by group (context / ad / user-device) and explain why `device_id`/`device_ip` needed different handling than the rest.
-- [ ] 5. You can articulate, in your own words, what SageMaker did on your behalf (provisioning, pulling your code into its container, running it, capturing `/opt/ml/model` to S3) vs. what your script owns (all the actual ML logic) — that split is the LyftLearn Compute analog: platform runs it, your team owns what runs.
+- [x] 1. Training job shows `Completed` in the console and in `describe_training_job`.
+- [x] 2. `model.tar.gz` exists in S3 and, unpacked, contains your model and encoder artifacts.
+- [x] 3. Your script prints validation AUC to the training logs, meaningfully above 0.5 — your pCTR model is actually discriminating clicks from non-clicks, not just running.
+- [x] 4. You can list the model's input columns by group (context / ad / user-device) and explain why `device_id`/`device_ip` needed different handling than the rest.
+- [x] 5. You can articulate, in your own words, what SageMaker did on your behalf (provisioning, pulling your code into its container, running it, capturing `/opt/ml/model` to S3) vs. what your script owns (all the actual ML logic) — that split is the LyftLearn Compute analog: platform runs it, your team owns what runs.
 
 ---
 

@@ -43,7 +43,13 @@ def parse_args() -> argparse.Namespace:
     # `hyperparameters` dict as `--key value` CLI args -- there's no magic here,
     # just a subprocess invocation.
     ap.add_argument("--n-features", type=int, default=features.N_FEATURES)
-    ap.add_argument("--C", type=float, default=1.0,
+    # Named `reg-c` rather than `C` on purpose. SageMaker renders each
+    # hyperparameter as a CLI flag, and a SINGLE-character name gets a single
+    # dash -- it invokes `train.py -C 0.1`, which argparse rejects against a
+    # `--C` declaration. Multi-character names always get the `--` form, so
+    # avoiding one-letter hyperparameter names avoids the problem entirely.
+    # dest="C" keeps the internal name matching sklearn's parameter.
+    ap.add_argument("--reg-c", dest="C", type=float, default=1.0,
                     help="inverse L2 regularization strength; smaller = stronger")
     ap.add_argument("--max-iter", type=int, default=200)
 

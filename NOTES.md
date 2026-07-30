@@ -143,6 +143,112 @@ Claude Code session, so it's in plaintext in the local transcript under
 
 ---
 
+## Status: Phase 2 — COMPLETE (2026-07-30)
+
+Job `learn-sage-pctr-2026-07-30-19-35-01-384`, `Completed`, **95 billable
+seconds on ml.m5.large = $0.003**. Total Phase 2 spend including three failed
+attempts: **~$0.005**.
+
+| Criterion | Result |
+|---|---|
+| 1. `describe_training_job` = Completed | PASS |
+| 2. `model.tar.gz` unpacks to model + encoder | PASS — model.joblib, featurizer.joblib, feature_config.json, metrics.json |
+| 3. Validation AUC meaningfully > 0.5 | PASS — **0.7322** |
+| 4. Columns by group; why device_id/ip differ | see below |
+| 5. What SageMaker did vs. what the script owns | see below |
+
+Artifact: `s3://learn-sage-ACCOUNT_ID/output/learn-sage-pctr-2026-07-30-19-35-01-384/output/model.tar.gz`
+Container: `sagemaker-scikit-learn:1.4-2-cpu-py3`
+
+Results (identical local and in-container, which is itself reassuring):
+AUC 0.7322 | log loss 0.4063 vs 0.4575 baseline (11.2% better) |
+predicted CTR 0.1685 vs actual 0.1710.
+
+Verified the artifact **loads and scores**, not merely that it exists:
+`assert_config_matches` passes and five test rows produce sane probabilities.
+
+### Three failures, each worth more than the success
+
+**1. Training quota was 0 account-wide.** Not regional — probed `us-west-2`
+too. New AWS accounts start at zero SageMaker training instances and need a
+Service Quotas increase (granted in ~1h here). A rejected job is free: the
+limit check happens *after* authorization, which incidentally proved the IAM
+work was correct before anything ran.
+
+**2. The execution role couldn't read the bucket.** The failure that the
+two-principals distinction predicts: `learn-sage-dev` reads
+`data/test/test.csv` fine from the CLI, but the container runs as the role, and
+the role got `AccessDenied` on the same object.
+
+Root cause is a naming coincidence: `AmazonSageMakerFullAccess` sounds
+blanket but its S3 grant is scoped to `arn:aws:s3:::*SageMaker*` /
+`*Sagemaker*` / `*sagemaker*`. Our bucket is `learn-sage-...` — no match. Had
+the bucket been named `sagemaker-learn-sage` this would have silently worked
+and taught nothing. Fixed by attaching `learn-sage-s3-access` (rendered from
+`iam/sagemaker-execution-policy.json.template`) **to the role**.
+
+Sub-failure worth its own line: the first attempt at that policy was pasted
+**unrendered**, with the literal string `ACCOUNT_ID` still in the ARNs. It
+attached without error and produced a byte-identical `AccessDenied` — a valid
+policy granting access to a bucket that does not exist. This is exactly the
+failure mode the `.json.template` extension exists to prevent, and it still
+happened, because the render step was done by hand.
+
+**3. `-C` vs `--C`.** SageMaker renders each hyperparameter as a CLI flag, and a
+**single-character** name gets a *single* dash: it invoked `train.py -C 0.1`,
+which argparse rejects against a `--C` declaration. `--max-iter` and
+`--n-features` were unaffected. Renamed to `--reg-c` with `dest="C"`.
+**Keep SageMaker hyperparameter names multi-character.**
+
+### Container vs. local library versions
+
+`train.py` logs the container environment on every run, because Phase 4 must
+load this pickle locally and compare predictions:
+
+| | container | local |
+|---|---|---|
+| python | 3.10.20 | 3.12.13 |
+| scikit-learn | 1.4.2 | 1.4.2 (pinned to match) |
+| numpy | 2.1.0 | 2.5.1 |
+| scipy | 1.15.3 | 1.18.0 |
+
+Both numpy are 2.x, so the pickle should load cleanly in Phase 4 — the
+dangerous case would have been a 1.x/2.x split. Worth re-checking if Phase 4's
+parity comparison ever disagrees.
+
+### Decision: hashing, and where the skew risk actually lives
+
+All 22 features become `"col=value"` tokens through one
+`FeatureHasher(2**18)`. Chosen over one-hot because `site_id` is unbounded in
+production: a fitted vocabulary needs a retrain before a new site can be
+represented at all, while a hash bucket absorbs it immediately.
+
+Measured cardinalities that motivated it: `device_ip` 33,635 distinct in 40,000
+rows (84% unique), `device_id` 6,926, `device_model` 2,360, `site_id` 1,053 —
+~48,000 distinct tokens total, against 262,144 slots, so collisions are rare.
+
+`hour` is **dropped** after deriving `hour_of_day` and `day_of_week`. All 240
+raw `YYMMDDHH` values are specific October 2014 dates; as a category the model
+would memorize dates that can never recur.
+
+**The honest wrinkle:** `FeatureHasher` is stateless — it fits nothing. So
+"save the fitted encoder" is nearly vacuous here, and that's precisely why
+hashing is attractive (no vocabulary to keep in sync). But the skew risk moves
+rather than vanishing: parity now depends on `src/features.py` and
+`n_features` being identical at train and serve time. Hence
+`feature_config.json` and `assert_config_matches()`, which Phase 4's
+`inference.py` calls at load time so a mismatch crashes loudly instead of
+silently scoring a feature space the model never saw.
+
+### Local-first was worth it
+
+The hyperparameter sweep (C in {0.1, 0.3, 1.0}) ran locally for $0 and picked
+C=0.1. The flag-rename fix was also verified locally before resubmitting. Every
+paid job that ran was a configuration already known to work — the three
+failures were all infrastructure, never modeling.
+
+---
+
 ## Environment
 
 | Thing | Value |

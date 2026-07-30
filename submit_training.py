@@ -42,7 +42,11 @@ USD_PER_HOUR = 0.115  # us-east-1 on-demand, billed per second
 HYPERPARAMETERS = {
     # Chosen by a local sweep over C in {0.1, 0.3, 1.0} -- free, and it meant the
     # paid job runs a configuration we already know converges and performs.
-    "C": 0.1,
+    #
+    # "reg-c", not "C": SageMaker renders a single-character hyperparameter name
+    # with a single dash (`-C 0.1`), which argparse won't match against a `--C`
+    # declaration. Keep hyperparameter names multi-character.
+    "reg-c": 0.1,
     "max-iter": 1000,
     "n-features": 2 ** 18,
 }
@@ -73,9 +77,14 @@ def main() -> None:
     ap.add_argument("--confirm", action="store_true",
                     help="required to actually submit a billable job")
     ap.add_argument("--instance-type", default=INSTANCE_TYPE)
+    # SageMaker quotas are per-region. The bucket stays in us-east-1 regardless;
+    # cross-region reads of a 6.7 MB dataset cost fractions of a cent, so this is
+    # a viable escape hatch if one region's quota is stuck at zero. Note that a
+    # job launched here must be torn down / checked in THAT region.
+    ap.add_argument("--region", default=REGION)
     args = ap.parse_args()
 
-    session = boto3.Session(region_name=REGION)
+    session = boto3.Session(region_name=args.region)
     account_id = session.client("sts").get_caller_identity()["Account"]
     bucket = BUCKET_TEMPLATE.format(account_id=account_id)
     role_arn = resolve_role_arn(session)
@@ -85,7 +94,7 @@ def main() -> None:
     output_uri = f"s3://{bucket}/output"
     code_uri = f"s3://{bucket}/code"
 
-    print(f"region        : {REGION}")
+    print(f"region        : {args.region}")
     print(f"role          : {ROLE_NAME}")
     print(f"container     : SKLearn {FRAMEWORK_VERSION} ({PY_VERSION})")
     print(f"instance      : {args.instance_type}  (${USD_PER_HOUR}/hr, per-second billing)")
